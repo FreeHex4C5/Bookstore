@@ -1,0 +1,6 @@
+<Project>
+  <!-- The Web UI is a separate project inside this folder; keep its files out of the console project. -->
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'DDD-Bookstore-Persian'">
+    <DefaultItemExcludes>$(DefaultItemExcludes);Web/**</DefaultItemExcludes>
+  </PropertyGroup>
+</Project>

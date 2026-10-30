@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>کتاب‌فروشی — بدون DDD و با DDD</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: Tahoma, "Segoe UI", sans-serif; background: #f4f5f7; color: #222; }
+    header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding: 16px 24px; background: #fff; border-bottom: 1px solid #ddd; }
+    header h1 { flex: 1; margin: 0; font-size: 18px; }
+    main { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 16px 24px; }
+    @media (max-width: 800px) { main { grid-template-columns: 1fr; } }
+    .panel { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 16px; }
+    .panel h2 { margin: 0; font-size: 16px; }
+    .source { margin: 4px 0 14px; font-size: 12px; color: #777; direction: ltr; text-align: right; }
+    .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; margin-bottom: 12px; }
+    label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+    input { width: 110px; padding: 6px; border: 1px solid #ccc; border-radius: 4px; font: inherit; }
+    button { padding: 7px 14px; border: 1px solid #2d6cdf; border-radius: 4px; background: #2d6cdf; color: #fff; font: inherit; cursor: pointer; }
+    button.secondary { background: #fff; color: #2d6cdf; }
+    button:disabled { opacity: .4; cursor: default; }
+    .order { margin-bottom: 12px; padding: 10px; border-radius: 6px; background: #f8f9fb; font-size: 14px; }
+    .log { max-height: 280px; overflow: auto; margin: 0; padding: 0; list-style: none; font-size: 13px; }
+    .log li { padding: 6px 8px; border-bottom: 1px solid #eee; }
+    .ok { color: #1a7f37; }
+    .fail { color: #c62828; }
+    #verdict { font-size: 14px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>کتاب‌فروشی — بدون DDD و با DDD</h1>
+    <span id="verdict"></span>
+    <button id="scenario">اجرای سناریوی ویدیو روی هر دو</button>
+  </header>
+
+  <main>
+    <section class="panel" data-version="before" data-title="بدون DDD" data-source="Before/BeforeDemo.cs → OrderService"></section>
+    <section class="panel" data-version="ddd" data-title="با DDD" data-source="Improved/Domain/Order.cs → Aggregate"></section>
+  </main>
+
+  <template id="panel-template">
+    <h2 data-ref="title"></h2>
+    <p class="source" data-ref="source"></p>
+    <div class="row">
+      <label>قیمت واحد <input data-ref="price" type="number" value="20"></label>
+      <label>تعداد <input data-ref="quantity" type="number" step="1" value="2"></label>
+      <button data-ref="create">ثبت سفارش</button>
+    </div>
+    <div class="order" data-ref="order">هنوز سفارشی ثبت نشده است.</div>
+    <div class="row">
+      <button class="secondary" data-ref="pay" disabled>پرداخت</button>
+      <button class="secondary" data-ref="ship" disabled>ارسال</button>
+      <button class="secondary" data-ref="cancel" disabled>لغو</button>
+    </div>
+    <ul class="log" data-ref="log"></ul>
+  </template>
+
+  <script>
+    const statusLabels = {
+      PendingPayment: "در انتظار پرداخت",
+      Paid: "پرداخت‌شده",
+      Shipped: "ارسال‌شده",
+      Cancelled: "لغوشده"
+    };
+
+    function createPanel(section) {
+      section.append(document.getElementById("panel-template").content.cloneNode(true));
+      const ref = name => section.querySelector(`[data-ref="${name}"]`);
+      ref("title").textContent = section.dataset.title;
+      ref("source").textContent = section.dataset.source;
+      let orderId = null;
+
+      async function call(title, path, body) {
+        let result;
+        try {
+          const response = await fetch(`/api/${section.dataset.version}/orders${path}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: body ? JSON.stringify(body) : undefined
+          });
+          result = response.ok ? await response.json() : { success: false, message: "ورودی نامعتبر است." };
+        } catch {
+          result = { success: false, message: "ارتباط با سرور برقرار نشد." };
+        }
+
+        if (result.success) showOrder(result.order);
+        addLog(title, result);
+      }
+
+      function showOrder(order) {
+        orderId = order.id;
+        ref("order").textContent =
+          `وضعیت: ${statusLabels[order.status]} | تعداد: ${order.quantity.toLocaleString("fa-IR")} | مبلغ کل: ${order.total.toLocaleString("fa-IR")}`;
+        for (const name of ["pay", "ship", "cancel"]) ref(name).disabled = false;
+      }
+
+      function addLog(title, result) {
+        const item = document.createElement("li");
+        item.className = result.success ? "ok" : "fail";
+        item.textContent = `${title}: ${result.success ? "موفق" : "ناموفق"} — ${result.message}`;
+        ref("log").append(item);
+        item.scrollIntoView({ block: "nearest" });
+      }
+
+      const actions = {
+        create(price, quantity) {
+          if (price !== undefined) { ref("price").value = price; ref("quantity").value = quantity; }
+          return call("ثبت سفارش", "", {
+            unitPrice: parseFloat(ref("price").value) || 0,
+            quantity: parseInt(ref("quantity").value, 10) || 0
+          });
+        },
+        pay: () => call("پرداخت", `/${orderId}/pay`),
+        ship: () => call("ارسال", `/${orderId}/ship`),
+        cancel: () => call("لغو", `/${orderId}/cancel`),
+        reset() {
+          orderId = null;
+          ref("order").textContent = "هنوز سفارشی ثبت نشده است.";
+          ref("log").replaceChildren();
+          for (const name of ["pay", "ship", "cancel"]) ref(name).disabled = true;
+        },
+        logText: () => [...ref("log").children].map(li => li.textContent).join("\n")
+      };
+
+      ref("create").onclick = () => actions.create();
+      ref("pay").onclick = actions.pay;
+      ref("ship").onclick = actions.ship;
+      ref("cancel").onclick = actions.cancel;
+      return actions;
+    }
+
+    const panels = [...document.querySelectorAll(".panel")].map(createPanel);
+    const verdict = document.getElementById("verdict");
+
+    // Same steps as AfterDemo.cs in the video.
+    document.getElementById("scenario").onclick = async () => {
+      verdict.textContent = "";
+      for (const panel of panels) {
+        panel.reset();
+        await panel.create(20, 0);
+        await panel.create(20, 2);
+        await panel.ship();
+        await panel.pay();
+        await panel.ship();
+        await panel.cancel();
+      }
+
+      const [before, ddd] = panels.map(panel => panel.logText());
+      verdict.className = before === ddd ? "ok" : "fail";
+      verdict.textContent = before === ddd
+        ? "✓ خروجی هر دو نسخه دقیقاً یکسان است."
+        : "✗ خروجی دو نسخه با هم فرق دارد.";
+    };
+  </script>
+</body>
+</html>

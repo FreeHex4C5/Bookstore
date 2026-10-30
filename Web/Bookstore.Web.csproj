@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>DddBookstore.Web</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DDD-Bookstore-Persian.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="ui\index.html" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>
